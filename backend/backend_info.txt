@@ -1,0 +1,15 @@
+camera_service.py
+        ↓
+gets frames
+
+detection_pipeline.py
+        ↓
+runs YOLO and produces detection data
+
+schemas/detection.py
+        ↓
+defines the data format
+
+routes/
+        ↓
+exposes everything through FastAPI

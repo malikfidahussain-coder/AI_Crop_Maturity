@@ -1,0 +1,28 @@
+tomato:
+  optimal_temperature: "18-21 C"
+  stages: [green, breaker, turning, pink, light_red, red]
+  harvest_rules:
+    green:      { readiness: low,    time: "7-14 days" }
+    breaker:    { readiness: low,    time: "5-7 days"  }
+    turning:    { readiness: medium, time: "3-5 days"  }
+    pink:       { readiness: medium, time: "2-3 days"  }
+    light_red:  { readiness: high,   time: "1-2 days"  }
+    red:        { readiness: high,   time: "now"        }
+
+mango:
+  optimal_temperature: "20-23 C"
+  stages: [green, breaker, turning, ripe]
+  harvest_rules:
+    green:    { readiness: low,    time: "5-9 days" }
+    breaker:  { readiness: medium, time: "3-5 days" }
+    turning:  { readiness: medium, time: "1-2 days" }
+    ripe:     { readiness: high,   time: "now"       }
+
+strawberry:
+  optimal_temperature: "10-27 C"
+  stages: [green, white, turning, red]
+  harvest_rules:
+    green:   { readiness: low,    time: "7-10 days" }
+    white:   { readiness: low,    time: "4-6 days"  }
+    turning: { readiness: medium, time: "1-2 days"  }
+    red:     { readiness: high,   time: "now"        }
