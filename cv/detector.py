@@ -1,75 +1,75 @@
 import sys
 import pathlib
-import time  
 import cv2
 import torch
 
+
 # Handle path systems across platforms
-sys.modules['pathlib._local'] = pathlib
-if sys.platform == 'win32':
+sys.modules["pathlib._local"] = pathlib
+
+if sys.platform == "win32":
     pathlib.PosixPath = pathlib.WindowsPath
 else:
     pathlib.WindowsPath = pathlib.PosixPath
 
-MODEL_PATH = "models/detection/yolov5s_trained.pt"  
+
+MODEL_PATH = "models/detection/yolov5s_trained.pt"
 CONFIDENCE = 0.40
 
-# SPEED OPTIMIZATION 1: Use GPU (CUDA/MPS) if available
-device = 'cuda' if torch.cuda.is_available() else ('mps' if torch.backends.mps.is_available() else 'cpu')
-print(f"Running inference on: {device.upper()}")
 
-# Load model onto the selected device
-model = torch.hub.load(
-    "ultralytics/yolov5",
-    "custom",
-    path=MODEL_PATH,
-    device=device
-)
-model.conf = CONFIDENCE
+class FruitDetector:
 
-cap = cv2.VideoCapture(0)
-if not cap.isOpened():
-    raise RuntimeError("Could not open webcam.")
+    def __init__(self):
+        self.device = (
+            "cuda"
+            if torch.cuda.is_available()
+            else (
+                "mps"
+                if torch.backends.mps.is_available()
+                else "cpu"
+            )
+        )
 
-# SPEED OPTIMIZATION 2: Cap the camera capture stream size
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        print(f"Running inference on: {self.device.upper()}")
 
-prev_time = 0
+        self.model = torch.hub.load(
+            "ultralytics/yolov5",
+            "custom",
+            path=MODEL_PATH,
+            device=self.device
+        )
 
-while True:
-    success, frame = cap.read()
-    if not success:
-        break
+        self.model.conf = CONFIDENCE
 
-    # Convert BGR to RGB
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    def detect(self, frame):
 
-    # SPEED OPTIMIZATION 3: Force the neural network to evaluate at a lower resolution (320 or 640)
-    results = model(rgb_frame, size=640)  
-    detections = results.xyxy[0]
+        rgb_frame = cv2.cvtColor(
+            frame,
+            cv2.COLOR_BGR2RGB
+        )
 
-    for detection in detections:
-        x1, y1, x2, y2, confidence, class_id = detection.tolist()
-        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-        class_name = model.names[int(class_id)]
+        results = self.model(
+            rgb_frame,
+            size=640
+        )
 
-        # Draw bounding boxes
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        label = f"{class_name} {confidence:.2f}"
-        cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        detections = []
 
-    # --- Calculate & Display FPS Counter ---
-    curr_time = time.time()
-    fps = 1 / (curr_time - prev_time)
-    prev_time = curr_time
-    cv2.putText(frame, f"FPS: {int(fps)}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        for detection in results.xyxy[0]:
 
-    # Show processed frame
-    cv2.imshow("Fruit Detection", frame)
+            x1, y1, x2, y2, confidence, class_id = detection.tolist()
 
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        break
+            class_id = int(class_id)
 
-cap.release()
-cv2.destroyAllWindows()
+            detections.append({
+                "crop": self.model.names[class_id],
+                "confidence": round(confidence, 2),
+                "bbox": [
+                    int(x1),
+                    int(y1),
+                    int(x2),
+                    int(y2)
+                ]
+            })
+
+        return detections
