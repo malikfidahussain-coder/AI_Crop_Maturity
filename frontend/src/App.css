@@ -43,6 +43,17 @@ body {
   background: #22c55e;
 }
 
+.camera-error {
+  padding: 10px 20px;
+  background: #3b1f1f;
+  color: #ffaaaa;
+  text-align: center;
+}
+
+.capture-canvas {
+  display: none;
+}
+
 .main-content {
   padding: 30px;
   display: flex;
@@ -51,11 +62,23 @@ body {
 
 .video-container {
   position: relative;
-  width: 900px;
-  height: 600px;
+  width: 640px;
+  height: 480px;
   overflow: hidden;
   background: #222;
   border-radius: 10px;
+}
+
+.camera-video {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  display: block;
+}
+
+.overlay-layer {
+  position: absolute;
+  inset: 0;
 }
 
 .video-placeholder {

@@ -2,11 +2,10 @@
 import cv2
 import numpy as np
 from fastapi import APIRouter, UploadFile, File
-from backend.services.pipeline import DetectionPipeline
+from backend.services.pipeline import get_pipeline
 from backend.schemas.detection import DetectionResponse
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
-pipeline = DetectionPipeline()
 
 @router.post("/detect", response_model=DetectionResponse)
 async def detect(file: UploadFile = File(...)):
@@ -17,5 +16,5 @@ async def detect(file: UploadFile = File(...)):
     if frame is None:
         return {"error": "Invalid image"}
 
-    result = pipeline.process_frame(frame)
+    result = get_pipeline().process_frame(frame)
     return result

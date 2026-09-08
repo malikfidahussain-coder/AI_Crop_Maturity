@@ -13,8 +13,43 @@ else:
     pathlib.WindowsPath = pathlib.PosixPath
 
 
-MODEL_PATH = "models/detection/yolov5s_trained.pt"
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
+MODEL_PATH = PROJECT_ROOT / "models" / "detection" / "yolov5s_trained.pt"
+YOLOV5_LOCAL = PROJECT_ROOT / "third_party" / "yolov5"
+TORCH_HUB_DIR = PROJECT_ROOT / ".torch_hub"
+
+# Operational filter used by this trained YOLOv5s detector.
+# README previously mentioned 65%; runtime behavior is 40%.
 CONFIDENCE = 0.40
+
+
+def _load_custom_yolov5(device):
+    if not MODEL_PATH.is_file():
+        raise FileNotFoundError(
+            f"YOLOv5s weights not found at {MODEL_PATH}"
+        )
+
+    TORCH_HUB_DIR.mkdir(parents=True, exist_ok=True)
+    torch.hub.set_dir(str(TORCH_HUB_DIR))
+
+    if YOLOV5_LOCAL.is_dir():
+        print(f"Loading YOLOv5 from local repo: {YOLOV5_LOCAL}")
+        return torch.hub.load(
+            str(YOLOV5_LOCAL),
+            "custom",
+            path=str(MODEL_PATH),
+            source="local",
+            device=device,
+        )
+
+    print("Loading YOLOv5 architecture from torch.hub (ultralytics/yolov5)")
+    return torch.hub.load(
+        "ultralytics/yolov5",
+        "custom",
+        path=str(MODEL_PATH),
+        device=device,
+        trust_repo=True,
+    )
 
 
 class FruitDetector:
@@ -31,14 +66,9 @@ class FruitDetector:
         )
 
         print(f"Running inference on: {self.device.upper()}")
+        print(f"Using weights: {MODEL_PATH}")
 
-        self.model = torch.hub.load(
-            "ultralytics/yolov5",
-            "custom",
-            path=MODEL_PATH,
-            device=self.device
-        )
-
+        self.model = _load_custom_yolov5(self.device)
         self.model.conf = CONFIDENCE
 
     def detect(self, frame):

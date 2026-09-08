@@ -4,6 +4,16 @@ from analysis.maturity.engine import predict_maturity
 from analysis.harvest.harvest import predict_harvest, get_crop_info
 
 
+_PIPELINE = None
+
+
+def get_pipeline():
+    global _PIPELINE
+    if _PIPELINE is None:
+        _PIPELINE = DetectionPipeline()
+    return _PIPELINE
+
+
 class DetectionPipeline:
     def __init__(self):
         self.detector = FruitDetector()
