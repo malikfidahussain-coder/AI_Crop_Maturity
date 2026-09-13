@@ -4,8 +4,9 @@ import AnalysisPanel from "./components/AnalysisPanel";
 import "./App.css";
 
 const WS_URL =
-  import.meta.env.VITE_WS_URL || "ws://127.0.0.1:8080/ws/detect";
-
+  import.meta.env.VITE_WS_URL ||
+  `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws/detect`;
+  
 const FRAME_WIDTH = 640;
 const FRAME_HEIGHT = 480;
 const JPEG_QUALITY = 0.6;
