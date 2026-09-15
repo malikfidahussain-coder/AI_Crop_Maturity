@@ -82,6 +82,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
             try:
                 frame = _decode_frame(payload)
+                settings = payload.get("settings", {})
+                
+                if payload.get("reset_tracker"):
+                    pipeline.reset_tracker()
+                    
             except ValueError as exc:
                 await websocket.send_json({
                     "detections": [],
@@ -90,7 +95,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 continue
 
             try:
-                result = pipeline.process_frame(frame)
+                result = pipeline.process_frame(frame, settings=settings)
+                print(f"Received settings: {settings}")
                 await websocket.send_json(_json_safe(result))
             except Exception as exc:
                 print(f"Pipeline error: {type(exc).__name__}: {exc}")

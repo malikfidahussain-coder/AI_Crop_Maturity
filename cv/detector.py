@@ -71,7 +71,16 @@ class FruitDetector:
         self.model = _load_custom_yolov5(self.device)
         self.model.conf = CONFIDENCE
 
-    def detect(self, frame):
+    def detect(self, frame, confidence=0.40, resolution=640, apply_clahe=False):
+        self.model.conf = confidence
+        
+        if apply_clahe and frame.shape[0] >= 8 and frame.shape[1] >= 8:
+            lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+            cl = clahe.apply(l)
+            limg = cv2.merge((cl,a,b))
+            frame = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
 
         rgb_frame = cv2.cvtColor(
             frame,
@@ -80,7 +89,7 @@ class FruitDetector:
 
         results = self.model(
             rgb_frame,
-            size=640
+            size=resolution
         )
 
         detections = []

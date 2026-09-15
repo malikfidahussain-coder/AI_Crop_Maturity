@@ -19,8 +19,23 @@ class DetectionPipeline:
         self.detector = FruitDetector()
         self.tracker = SimpleTracker()
 
-    def process_frame(self, frame):
-        raw_detections = self.detector.detect(frame)
+    def reset_tracker(self):
+        self.tracker = SimpleTracker()
+
+    def process_frame(self, frame, settings=None):
+        if settings is None:
+            settings = {}
+            
+        confidence = float(settings.get("confidence", 0.40))
+        resolution = int(settings.get("resolution", 640))
+        apply_clahe = bool(settings.get("clahe", False))
+
+        raw_detections = self.detector.detect(
+            frame, 
+            confidence=confidence, 
+            resolution=resolution, 
+            apply_clahe=apply_clahe
+        )
         tracked_detections = self.tracker.update(raw_detections)
         
         final_detections = []
