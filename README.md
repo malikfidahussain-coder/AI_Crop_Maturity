@@ -1,6 +1,6 @@
 # AI Crop Maturity Detection System
 
-A real-time computer vision system for detecting agricultural crops, tracking individual fruits, estimating maturity, and predicting harvest readiness from a local camera feed.
+A real-time computer vision system for detecting agricultural crops, tracking individual fruits, estimating maturity, and predicting harvest readiness from a **browser webcam**.
 
 Developed as an internal technical initiative at **Evolvian Softwares**, this project currently supports:
 
@@ -8,7 +8,7 @@ Developed as an internal technical initiative at **Evolvian Softwares**, this pr
 - 🥭 Mangoes
 - 🍓 Strawberries
 
-The system runs locally on a laptop and processes live camera input without relying on cloud inference or external AI APIs.
+The browser captures the user's webcam and sends JPEG frames to FastAPI over WebSocket. Inference still runs locally (or later in a cloud container) with the trained **YOLOv5s** model. The backend never opens `cv2.VideoCapture(0)` on the production WebSocket path.
 
 ---
 
@@ -18,17 +18,18 @@ The **AI Crop Maturity Detection System** is an end-to-end computer vision pipel
 
 The system performs:
 
-1. Real-time crop detection using YOLOv5
-2. Persistent object identification using a custom centroid tracker
-3. Region of Interest (ROI) extraction
-4. HSV-based maturity analysis
-5. Crop-specific maturity stage classification
-6. Rule-based harvest readiness prediction
-7. Estimated harvest-time calculation
-8. Real-time visualization through a React dashboard
-9. Real-time communication through FastAPI WebSockets
+1. Browser webcam capture (`getUserMedia`)
+2. JPEG frame transport over WebSocket
+3. Real-time crop detection using the trained YOLOv5s weights
+4. Persistent object identification using a custom centroid tracker
+5. Region of Interest (ROI) extraction
+6. HSV-based maturity analysis
+7. Crop-specific maturity stage classification
+8. Rule-based harvest readiness prediction
+9. Estimated harvest-time calculation
+10. Overlay of JSON detections on the live local video
 
-The current implementation is designed as a **local MVP**, where the laptop webcam acts as the input source and all processing occurs locally.
+The current implementation is a **cloud-ready local MVP**: the camera lives in the browser, and the backend only receives frames and returns analysis JSON.
 
 ---
 
@@ -37,29 +38,15 @@ The current implementation is designed as a **local MVP**, where the laptop webc
 ```mermaid
 graph TD
 
-    A[Local Camera / OpenCV] -->|RGB Video Frame| B[YOLOv5 Detector]
-
-    B -->|Bounding Boxes + Confidence| C[Centroid Tracker]
-
-    C -->|Persistent Object ID| D[Crop ROI Extraction]
-
-    D -->|ROI Pixels| E[HSV Maturity Engine]
-
-    E -->|Maturity Stage + Score| F[Harvest Engine]
-
-    F -->|Cross-reference crops.yaml| G[Readiness + ETA]
-
-    A -->|Encoded Video Frame| H((FastAPI WebSocket))
-
-    G -->|JSON Analysis Payload| H
-
-    H -->|Real-Time Sync| I[React / Vite Dashboard]
-
-    I --> J[Video Canvas]
-
-    I --> K[Analysis Panel]
-
-    I --> L[Live Metrics]
+    A[Browser Webcam] -->|Local video| B[React video + reusable canvas]
+    B -->|JPEG Base64 WebSocket| C[FastAPI Frame Decoder]
+    C -->|BGR frame| D[YOLOv5s Detector]
+    D -->|Bounding Boxes + Confidence| E[Centroid Tracker]
+    E -->|Persistent Object ID| F[Crop ROI Extraction]
+    F -->|ROI Pixels| G[HSV Maturity Engine]
+    G -->|Maturity Stage + Score| H[Harvest Engine]
+    H -->|JSON detections| C
+    C -->|JSON only| I[React Dashboard Overlay]
 ```
 
 ---
@@ -67,14 +54,16 @@ graph TD
 # 🔄 End-to-End Pipeline
 
 ```text
-Camera
+Browser Webcam
    │
    ▼
-OpenCV
+React video + reusable 640x480 canvas
    │
-   ├── Capture Frame
-   ├── Resize / Preprocess
-   └── Control Processing Rate
+   ├── JPEG encode (quality ~0.6)
+   └── Send only when previous result returned
+   │
+   ▼
+FastAPI WebSocket decoder
    │
    ▼
 YOLOv5 Detector
@@ -174,21 +163,25 @@ Each crop can have its own maturity stages and configuration.
 
 # 🔍 Core Components
 
-## 1. OpenCV Camera Pipeline
+## 1. Browser Camera Pipeline
 
-OpenCV provides the interface between the laptop webcam and the AI pipeline.
+The user's browser owns the webcam. The backend never accesses a physical camera on the production WebSocket path.
 
-### Responsibilities
+### Frontend responsibilities
 
-- Access the local webcam
-- Capture live video frames
-- Resize frames when required
-- Preprocess frames
-- Control the frame-processing rate
-- Pass frames to YOLOv5
-- Support real-time visualization
+- Request camera permission with `navigator.mediaDevices.getUserMedia()`
+- Display the live stream in a `<video>` element
+- Capture 640×480 JPEG frames from a reusable canvas
+- Send one frame at a time over WebSocket and wait for the JSON result
+- Overlay detections on the local video
 
-The camera acts as the primary input source for the complete system.
+### Backend responsibilities
+
+- Decode Base64 JPEG frames into OpenCV BGR images
+- Run the existing YOLOv5s / tracker / ROI / maturity / harvest pipeline
+- Return JSON analysis only (no processed video frames)
+
+`cv/camera.py` remains in the repository for optional local OpenCV experiments. The live dashboard path does not use `cv2.VideoCapture(0)`.
 
 ---
 
@@ -214,7 +207,15 @@ Crop Detection
 Bounding Box + Confidence
 ```
 
-The current implementation applies a **65% confidence threshold** to filter weak detections and reduce background noise.
+The current implementation applies a **40% (`0.40`) confidence threshold** in `cv/detector.py` to filter weak detections. Earlier project notes mentioned 65%; that value is **not** used at runtime so model behavior stays unchanged.
+
+Weights are loaded from a project-root path:
+
+```text
+models/detection/yolov5s_trained.pt
+```
+
+YOLOv5 architecture code is loaded with `torch.hub.load("ultralytics/yolov5", "custom", ...)`. The hub cache is stored in `.torch_hub/` at the project root. For offline/Docker use later, clone the YOLOv5 repo to `third_party/yolov5` and the detector will load that local copy instead of downloading at runtime. The trained `.pt` file is never replaced.
 
 Example detection result:
 
@@ -510,12 +511,12 @@ This structured result is passed through the backend and consumed by the fronten
 
 FastAPI provides the local backend communication layer.
 
-The backend runs locally on the same machine and does not require cloud deployment.
+The backend can run on localhost for development. The same WebSocket contract (`/ws/detect`) is intended for a later cloud container using `VITE_WS_URL` / `wss://`.
 
 Example local backend:
 
 ```text
-http://localhost:8000
+http://localhost:8080
 ```
 
 The backend separates:
@@ -545,18 +546,26 @@ The live system uses asynchronous WebSocket communication.
 Conceptually:
 
 ```text
-Camera Frame
+Browser JPEG frame
      ↓
-AI Pipeline
+WebSocket JSON { "image": "data:image/jpeg;base64,..." }
      ↓
-Analysis Result
+FastAPI decode
      ↓
-FastAPI WebSocket
+AI Pipeline (YOLOv5s unchanged)
      ↓
-React Dashboard
+JSON { "detections": [...] }
+     ↓
+React overlay on local video
 ```
 
-The video/frame information and structured analysis are transmitted to the frontend to maintain a real-time dashboard.
+The backend does **not** send processed video frames back. Frames are processed with a request/response strategy to avoid a backlog: send one frame, wait for the result, then capture the newest frame.
+
+Set the frontend WebSocket URL with `VITE_WS_URL`. Local fallback:
+
+```text
+ws://127.0.0.1:8080/ws/detect
+```
 
 ---
 
@@ -673,7 +682,7 @@ Install the following before running the system:
 - Node.js
 - npm
 - Git
-- Working laptop webcam
+- A browser with webcam permission
 
 ---
 
@@ -705,10 +714,18 @@ Install Python dependencies:
 pip install -r requirements.txt
 ```
 
-Move into the backend directory and start the FastAPI server:
+Start the FastAPI server from the **repository root** (not from `backend/`):
 
 ```bash
-uvicorn backend.main:app --reload
+uvicorn backend.main:app --reload --host 127.0.0.1 --port 8080
+```
+
+The YOLOv5s weights are loaded from a path relative to the project root, not the current working directory.
+
+Optional frontend WebSocket override (`frontend/.env`):
+
+```text
+VITE_WS_URL=ws://127.0.0.1:8080/ws/detect
 ```
 
 
@@ -744,8 +761,10 @@ Open the local URL displayed by Vite.
 
 ## Start Backend
 
+From the repository root:
+
 ```bash
-uvicorn backend.main:app --reload
+uvicorn backend.main:app --reload --host 127.0.0.1 --port 8080
 ```
 
 ## Start Frontend
@@ -759,11 +778,15 @@ npm run dev
 The complete system then follows:
 
 ```text
-Laptop Webcam
+Browser Webcam
       ↓
-OpenCV
+React video + JPEG canvas
       ↓
-YOLOv5
+WebSocket
+      ↓
+FastAPI
+      ↓
+YOLOv5s
       ↓
 Centroid Tracker
       ↓
@@ -773,9 +796,9 @@ HSV Maturity Engine
       ↓
 Harvest Engine
       ↓
-FastAPI WebSocket
+JSON detections
       ↓
-React / Vite Dashboard
+React overlay / analysis panel
 ```
 
 ---
@@ -827,11 +850,11 @@ Example:
 For live camera analysis:
 
 ```text
-Frame N
+Frame N (browser JPEG)
    ↓
-OpenCV
+FastAPI decode
    ↓
-YOLOv5
+YOLOv5s
    ↓
 Object Tracking
    ↓
@@ -941,10 +964,10 @@ These tests are particularly important because the intended use case involves mo
 The current MVP includes:
 
 ```text
-✓ Local webcam input
-✓ OpenCV frame processing
-✓ YOLOv5 crop detection
-✓ 65% confidence threshold
+✓ Browser webcam input
+✓ JPEG frames over WebSocket
+✓ YOLOv5s crop detection (trained weights unchanged)
+✓ 40% confidence threshold (matches cv/detector.py)
 ✓ Custom centroid object tracking
 ✓ Persistent object IDs
 ✓ ROI extraction
@@ -952,9 +975,10 @@ The current MVP includes:
 ✓ Crop-specific maturity stages
 ✓ Rule-based harvest prediction
 ✓ Harvest readiness calculation
-✓ FastAPI WebSocket communication
-✓ React / Vite dashboard
+✓ FastAPI WebSocket JSON results
+✓ React / Vite dashboard overlay
 ✓ Local end-to-end execution
+✓ Cloud-ready transport (no server-side webcam)
 ```
 
 ---
@@ -970,7 +994,7 @@ The current system is an MVP and has several limitations.
 - RGB cameras cannot directly measure environmental temperature.
 - Detection performance depends on dataset quality and diversity.
 - Severe occlusion and motion blur may reduce detection accuracy.
-- The current implementation is intended for local use and is not a production deployment.
+- The current implementation is a local MVP of a cloud-ready architecture; Docker/deployment is a later step.
 - Biological maturity cannot always be determined reliably from a single image.
 - Crop-specific thresholds require appropriate dataset validation.
 
@@ -992,7 +1016,7 @@ Potential future improvements include:
 - Model optimization for higher FPS
 - Historical analysis and data storage
 - More advanced dashboard analytics
-- Cloud/edge deployment
+- Cloud/edge deployment (Docker later; this architecture is the prerequisite)
 
 ---
 
@@ -1048,18 +1072,18 @@ The system follows a modular approach in which each component performs a specifi
 
 ```text
                          ┌──────────────────────┐
-                         │    Laptop Webcam     │
+                         │   Browser Webcam     │
                          └───────────┬──────────┘
                                      │
                                      ▼
                          ┌──────────────────────┐
-                         │        OpenCV        │
-                         │ Frame Capture/Resize │
+                         │ React video + canvas │
+                         │ JPEG over WebSocket  │
                          └───────────┬──────────┘
                                      │
                                      ▼
                          ┌──────────────────────┐
-                         │       YOLOv5         │
+                         │       YOLOv5s        │
                          │   Crop Detection     │
                          └───────────┬──────────┘
                                      │

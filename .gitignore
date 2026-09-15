@@ -1,6 +1,7 @@
 /myenv
 .env
 /videos
+.torch_hub/
 
 
 __pycache__/
