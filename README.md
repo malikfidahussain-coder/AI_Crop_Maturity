@@ -38,8 +38,8 @@ The current implementation is a **cloud-ready local MVP**: the camera lives in t
 ```mermaid
 graph TD
 
-    A[Browser Webcam] -->|Local video| B[React video + reusable canvas]
-    B -->|JPEG Base64 WebSocket| C[FastAPI Frame Decoder]
+    A["Browser (Live Camera / Video / Image)"] -->|Local media| B[React canvas extractor]
+    B -->|JPEG Base64 WebSocket + Settings| C[FastAPI Frame Decoder]
     C -->|BGR frame| D[YOLOv5s Detector]
     D -->|Bounding Boxes + Confidence| E[Centroid Tracker]
     E -->|Persistent Object ID| F[Crop ROI Extraction]
@@ -54,13 +54,13 @@ graph TD
 # 🔄 End-to-End Pipeline
 
 ```text
-Browser Webcam
+Browser (Live Camera / Video / Image)
    │
    ▼
-React video + reusable 640x480 canvas
+React canvas (variable inference resolution)
    │
    ├── JPEG encode (quality ~0.6)
-   └── Send only when previous result returned
+   └── Send payload (Image + Settings) via WebSocket
    │
    ▼
 FastAPI WebSocket decoder
@@ -163,22 +163,23 @@ Each crop can have its own maturity stages and configuration.
 
 # 🔍 Core Components
 
-## 1. Browser Camera Pipeline
+## 1. Browser Media Pipeline
 
-The user's browser owns the webcam. The backend never accesses a physical camera on the production WebSocket path.
+The user's browser handles media input. The backend never accesses a physical camera on the production WebSocket path.
 
 ### Frontend responsibilities
 
-- Request camera permission with `navigator.mediaDevices.getUserMedia()`
-- Display the live stream in a `<video>` element
-- Capture 640×480 JPEG frames from a reusable canvas
-- Send one frame at a time over WebSocket and wait for the JSON result
-- Overlay detections on the local video
+- Provide input modes for Live Camera (`getUserMedia`), Video upload, and Image upload
+- Display the live stream or media in a `<video>` or `<img>` element
+- Capture JPEG frames from a reusable canvas (with configurable inference resolution)
+- Send one frame at a time over WebSocket along with user settings (Confidence, Resolution, CLAHE)
+- Overlay detections on the local media
 
 ### Backend responsibilities
 
 - Decode Base64 JPEG frames into OpenCV BGR images
-- Run the existing YOLOv5s / tracker / ROI / maturity / harvest pipeline
+- Apply optional preprocessing (like CLAHE) based on frontend settings
+- Run the existing YOLOv5s / tracker / ROI / maturity / harvest pipeline using dynamic configuration
 - Return JSON analysis only (no processed video frames)
 
 `cv/camera.py` remains in the repository for optional local OpenCV experiments. The live dashboard path does not use `cv2.VideoCapture(0)`.
@@ -207,7 +208,7 @@ Crop Detection
 Bounding Box + Confidence
 ```
 
-The current implementation applies a **40% (`0.40`) confidence threshold** in `cv/detector.py` to filter weak detections. Earlier project notes mentioned 65%; that value is **not** used at runtime so model behavior stays unchanged.
+The system supports dynamic configuration of the **confidence threshold** and **inference resolution** directly from the frontend dashboard. The default confidence is set to 40% (`0.40`), but users can adjust it in real-time. Optional CLAHE preprocessing can also be enabled before the frame is passed to the detector.
 
 Weights are loaded from a project-root path:
 
@@ -499,7 +500,8 @@ The system can represent the final analysis using a structured JSON payload such
     "harvest": {
         "readiness": "high",
         "estimated_time": "2-3 days"
-    }
+    },
+    "temperature": "18-21 C"
 }
 ```
 
@@ -546,17 +548,17 @@ The live system uses asynchronous WebSocket communication.
 Conceptually:
 
 ```text
-Browser JPEG frame
+Browser JPEG frame + Settings
      ↓
-WebSocket JSON { "image": "data:image/jpeg;base64,..." }
+WebSocket JSON { "image": "data:image/jpeg;base64,...", "settings": {...} }
      ↓
-FastAPI decode
+FastAPI decode & config apply
      ↓
-AI Pipeline (YOLOv5s unchanged)
+AI Pipeline (YOLOv5s with dynamic config)
      ↓
 JSON { "detections": [...] }
      ↓
-React overlay on local video
+React overlay on local media
 ```
 
 The backend does **not** send processed video frames back. Frames are processed with a request/response strategy to avoid a backlog: send one frame, wait for the result, then capture the newest frame.
@@ -575,7 +577,9 @@ The frontend provides the user interface.
 
 The dashboard can display:
 
-- Live camera feed
+- Live camera feed, Video playback, or Static Image viewing
+- Light/Dark mode toggling and collapsible sidebar
+- Interactive settings: Input Mode, Confidence Threshold, CLAHE Preprocessing, Frame Skip, Inference Resolution
 - Detection bounding boxes
 - Crop names
 - Persistent object IDs
@@ -584,7 +588,7 @@ The dashboard can display:
 - Maturity score
 - Harvest readiness
 - Estimated harvest time
-- Crop-specific information
+- Crop-specific information (e.g. optimal storage temperature)
 
 Example:
 
@@ -621,26 +625,28 @@ Example:
 AI_Crop_Maturity/
 │
 ├── analysis/
-│   ├── maturity/
-│   └── harvest/
+│   ├── harvest/
+│   └── maturity/
 │
 ├── backend/
 │   ├── main.py
-│   └── schemas/
+│   ├── routes/
+│   ├── schemas/
+│   └── services/
 │
 ├── config/
 │   └── crops.yaml
 │
 ├── cv/
-│   ├── detection.py
-│   ├── tracker.py
-│   └── preprocessing.py
+│   ├── camera.py
+│   ├── detector.py
+│   └── tracker.py
 │
 ├── frontend/
 │   ├── src/
 │   ├── public/
 │   ├── package.json
-│   └── vite.config.*
+│   └── vite.config.js
 │
 ├── models/
 │   └── *.pt
@@ -778,15 +784,15 @@ npm run dev
 The complete system then follows:
 
 ```text
-Browser Webcam
+Browser Media (Live Camera / Video / Image)
       ↓
-React video + JPEG canvas
+React canvas + JPEG payload & Settings
       ↓
 WebSocket
       ↓
-FastAPI
+FastAPI (Dynamic Settings applied)
       ↓
-YOLOv5s
+YOLOv5s (with optional CLAHE)
       ↓
 Centroid Tracker
       ↓
