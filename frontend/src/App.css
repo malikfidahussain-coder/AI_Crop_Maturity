@@ -34,7 +34,7 @@ body {
 } 
  
 .sidebar { 
-  width: 240px; 
+  width: 260px; 
   background: #111827; /* Dark panel */
   border-right: 1px solid #1f2937;
   padding: 1.5rem 1.25rem; 
@@ -44,9 +44,9 @@ body {
 } 
  
 .sidebar h2 { 
-  font-size: 1.1rem; 
+  font-size: 0.9rem; 
   font-weight: 600; 
-  margin: 0 0 1.2rem 0; 
+  margin: 0 0 0.5rem 0; 
   /* Violet-Purple Gradient Text */
   background: linear-gradient(135deg, #a78bfa, #8b5cf6);
   -webkit-background-clip: text;
@@ -78,7 +78,7 @@ body {
 .settings-divider { 
   height: 1px; 
   background-color: #1f2937; 
-  margin: 15px 0; 
+  margin: 5px 0; 
 } 
  
 /* Custom inputs */ 
@@ -89,7 +89,7 @@ body {
   font-size: 13px; 
   color: #e2e8f0; 
   cursor: pointer; 
-  margin-bottom: 4px; 
+  margin-bottom: 2px; 
   transition: color 0.2s;
 } 
 .radio-label:hover, .checkbox-label:hover {
@@ -176,7 +176,7 @@ body {
  
 .main-content { 
   flex: 1; 
-  padding: 2rem 2.5rem; 
+  padding: 2rem 0.5rem; 
   display: flex; 
   flex-direction: column; 
   overflow-y: auto; 
@@ -266,9 +266,9 @@ body {
  
 .video-container { 
   position:relative; 
-  width: 700px; 
+  flex: 1;
+  min-width: 500px;
   height: 480px; 
-  flex-shrink: 0; 
   overflow:hidden; 
   background: #111827; 
   border: 1px solid #1f2937;
@@ -319,4 +319,109 @@ body {
   color: #10b981;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* ================================ */
+/* LIGHT MODE THEME OVERRIDES       */
+/* ================================ */
+
+body.light-mode {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+body.light-mode .sidebar {
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+}
+
+body.light-mode .main-content {
+  background: #f8fafc;
+}
+
+body.light-mode .title {
+  color: #0f172a;
+}
+
+body.light-mode .subtitle {
+  color: #475569;
+}
+
+body.light-mode .settings-label {
+  color: #475569;
+}
+
+body.light-mode .settings-divider {
+  background-color: #e2e8f0;
+}
+
+body.light-mode .radio-label, 
+body.light-mode .checkbox-label {
+  color: #334155;
+}
+
+body.light-mode .radio-label:hover, 
+body.light-mode .checkbox-label:hover {
+  color: #0f172a;
+}
+
+body.light-mode .custom-radio,
+body.light-mode .custom-checkbox {
+  border-color: #cbd5e1;
+}
+
+body.light-mode .accent-slider {
+  background: #e2e8f0;
+}
+
+body.light-mode .status-indicator {
+  color: #475569;
+}
+
+body.light-mode .status-dot {
+  background: #cbd5e1;
+}
+
+body.light-mode .video-container {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+body.light-mode .detection-card {
+  background: rgba(255, 255, 255, 0.95);
+  color: #1e293b;
+}
+
+/* Theme Toggle Button Style */
+.theme-toggle-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fafafa;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+  z-index: 100;
+}
+
+.theme-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+body.light-mode .theme-toggle-btn {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #1e293b;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+body.light-mode .theme-toggle-btn:hover {
+  background: #f8fafc;
 }

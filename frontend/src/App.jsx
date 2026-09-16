@@ -17,6 +17,8 @@ function App() {
   const [cameraError, setCameraError] = useState("");
   const [connectionState, setConnectionState] = useState("Connecting");
   const [streamActive, setStreamActive] = useState(true);
+  const [isLightMode, setIsLightMode] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const [inputMode, setInputMode] = useState("Live Camera Feed");
   const [confidence, setConfidence] = useState(0.40);
@@ -45,6 +47,15 @@ function App() {
     inputModeRef.current = inputMode;
     streamActiveRef.current = streamActive;
   }, [confidence, frameSkip, resolution, clahe, inputMode, streamActive]);
+
+
+  useEffect(() => {
+    if (isLightMode) {
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+    }
+  }, [isLightMode]);
 
   // When settings change in Image mode, trigger a re-render
   useEffect(() => {
@@ -198,13 +209,17 @@ function App() {
         };
 
         ws.onclose = () => {
-          setConnectionState("Disconnected");
+          if (wsRef.current === ws) {
+            setConnectionState("Disconnected");
+          }
           clearWait();
         };
 
         ws.onerror = (error) => {
           console.error("WebSocket error:", error);
-          setConnectionState("Error");
+          if (wsRef.current === ws) {
+            setConnectionState("Error");
+          }
           clearWait();
         };
     };
@@ -278,6 +293,7 @@ function App() {
   return (
     <div className="app">
       <div className="dashboard">
+        {isSidebarOpen && (
         <aside className="sidebar">
           <h2>Navigation</h2>
           
@@ -393,9 +409,33 @@ function App() {
             />
           </div>
         </aside>
+        )}
 
         <main className="main-content">
-          <div className="main-header">
+          <div className="main-header" style={{ position: 'relative', display: 'flex' }}>
+            <button 
+              className="sidebar-toggle-btn"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              title="Toggle Sidebar"
+              style={{
+                background: 'transparent', border: 'none', 
+                color: isLightMode ? '#1e293b' : '#fafafa', 
+                fontSize: '1.8rem', cursor: 'pointer', 
+                marginRight: '20px', padding: 0,
+                display: 'flex', alignItems: 'flex-start',
+                marginTop: '4px'
+              }}
+            >
+              ☰
+            </button>
+            <div style={{ flex: 1, position: 'relative' }}>
+            <button 
+              className="theme-toggle-btn"
+              onClick={() => setIsLightMode(!isLightMode)}
+              title="Toggle Theme"
+            >
+              {isLightMode ? '🌙 Dark' : '☀️ Light'}
+            </button>
             <h1 className="title">
               🌱 <span className="gradient-text">AI Crop Maturity Detection System</span>
             </h1>
@@ -442,6 +482,7 @@ function App() {
                 {cameraError}
               </div>
             )}
+            </div>
           </div>
 
           <canvas
@@ -466,7 +507,7 @@ function App() {
                     <span style={{ color: '#555' }}>Please select a file to process.</span>
                 </div>
             )}
-            <AnalysisPanel detections={detections} />
+            <AnalysisPanel detections={detections} isLightMode={isLightMode} isSidebarOpen={isSidebarOpen} />
           </div>
         </main>
       </div>
