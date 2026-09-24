@@ -36,17 +36,83 @@ The current implementation is a **cloud-ready local MVP**: the camera lives in t
 # 🏗️ System Architecture
 
 ```mermaid
-graph TD
+flowchart TD
 
-    A["Browser (Live Camera / Video / Image)"] -->|Local media| B[React canvas extractor]
-    B -->|JPEG Base64 WebSocket + Settings| C[FastAPI Frame Decoder]
-    C -->|BGR frame| D[YOLOv5s Detector]
-    D -->|Bounding Boxes + Confidence| E[Centroid Tracker]
-    E -->|Persistent Object ID| F[Crop ROI Extraction]
-    F -->|ROI Pixels| G[HSV Maturity Engine]
-    G -->|Maturity Stage + Score| H[Harvest Engine]
-    H -->|JSON detections| C
-    C -->|JSON only| I[React Dashboard Overlay]
+subgraph group_frontend["Browser dashboard"]
+  node_app["Dashboard app<br/>[App.jsx]"]
+  node_video_canvas["Video canvas<br/>[VideoCanvas.jsx]"]
+  node_analysis_panel["Analysis panel<br/>[AnalysisPanel.jsx]"]
+end
+
+subgraph group_backend["API and orchestration"]
+  node_api["FastAPI app<br/>[main.py]"]
+  node_websocket["Frame WebSocket<br/>[websocket.py]"]
+  node_pipeline["Detection pipeline<br/>[pipeline.py]"]
+  node_roi["ROI extraction<br/>[pipeline.py]"]
+end
+
+subgraph group_vision["Crop vision"]
+  node_detector["Crop detector<br/>[detector.py]"]
+  node_tracker["Centroid tracker<br/>[tracker.py]"]
+  node_yolo["YOLOv5 runtime"]
+  node_weights["Trained weights<br/>[yolov5s_trained.pt]"]
+end
+
+subgraph group_analysis["Maturity and harvest"]
+  node_maturity["Maturity engine<br/>[engine.py]"]
+  node_harvest["Harvest rules<br/>[harvest.py]"]
+  node_crop_config["Crop configuration<br/>[crops.yaml]"]
+end
+
+node_user(("User"))
+node_media["Camera or media"]
+
+node_user -->|"selects mode"| node_app
+node_media -->|"provides frames"| node_app
+node_app -->|"sends JPEG and settings"| node_websocket
+node_api -->|"registers route"| node_websocket
+node_websocket -->|"passes decoded frame"| node_pipeline
+node_pipeline -->|"detects crops"| node_detector
+node_detector -->|"runs inference"| node_yolo
+node_detector -->|"loads model weights"| node_weights
+node_pipeline -->|"updates identities"| node_tracker
+node_pipeline -->|"extracts bounding-box region"| node_roi
+node_pipeline -->|"classifies ROI"| node_maturity
+node_pipeline -->|"predicts readiness"| node_harvest
+node_pipeline -->|"gets crop information"| node_harvest
+node_harvest -->|"reads rules and stages"| node_crop_config
+node_pipeline -->|"returns detections"| node_websocket
+node_websocket -->|"sends JSON results"| node_app
+node_app -->|"passes detections"| node_video_canvas
+node_app -->|"passes analysis"| node_analysis_panel
+
+click node_app "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/frontend/src/App.jsx"
+click node_video_canvas "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/frontend/src/components/VideoCanvas.jsx"
+click node_analysis_panel "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/frontend/src/components/AnalysisPanel.jsx"
+click node_api "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/backend/main.py"
+click node_websocket "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/backend/routes/websocket.py"
+click node_pipeline "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/backend/services/pipeline.py"
+click node_detector "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/cv/detector.py"
+click node_tracker "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/cv/tracker.py"
+click node_roi "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/backend/services/pipeline.py"
+click node_yolo "https://github.com/malikfidahussain-coder/ai_crop_maturity/tree/main/third_party/yolov5"
+click node_weights "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/models/detection/yolov5s_trained.pt"
+click node_maturity "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/analysis/maturity/engine.py"
+click node_harvest "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/analysis/harvest/harvest.py"
+click node_crop_config "https://github.com/malikfidahussain-coder/ai_crop_maturity/blob/main/config/crops.yaml"
+
+classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
+class node_app,node_video_canvas,node_analysis_panel,node_user toneBlue
+class node_api,node_websocket,node_pipeline,node_roi toneAmber
+class node_detector,node_tracker,node_yolo,node_weights toneMint
+class node_maturity,node_harvest,node_crop_config toneRose
+class node_media toneIndigo
 ```
 
 ---
